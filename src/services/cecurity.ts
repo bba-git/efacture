@@ -161,7 +161,7 @@ export class CecurityService {
   static async uploadFiles(files: FileWithFingerprint[]): Promise<FileUploadResponse> {
     try {
       const token = await this.getToken();
-      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/new?subscriptionId=${this.SUBSCRIPTION_ID}`;
+      const url = `${this.API_URL}/public/v3/einvoice-outbound/uploads/new?subscriptionId=${this.SUBSCRIPTION_ID}`;
 
       const requestBody = {
         files: files.map(file => ({
@@ -221,7 +221,7 @@ export class CecurityService {
       }
 
       const token = await this.getToken();
-      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/${uploadId}/upload`;
+      const url = `${this.API_URL}/public/v3/einvoice-outbound/uploads/${uploadId}/upload`;
 
       // Create FormData object
       const formData = new FormData();
@@ -294,7 +294,7 @@ export class CecurityService {
       }
 
       const token = await this.getToken();
-      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/${uploadId}/complete`;
+      const url = `${this.API_URL}/public/v3/einvoice-outbound/uploads/${uploadId}/complete`;
 
       const headers = {
         'Accept': 'application/json',

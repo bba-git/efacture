@@ -68,6 +68,11 @@ export default function UploadPage() {
       
       await CecurityService.uploadFileContent(uploadId, selectedFiles);
       setUploadStatus('File content uploaded successfully!');
+
+      // Complete the upload
+      setUploadStatus('Completing upload...');
+      const jobId = await CecurityService.completeUpload(uploadId);
+      setUploadStatus(`Upload completed successfully! Job ID: ${jobId}`);
     } catch (error) {
       console.error('Error uploading content:', error);
       setError(error instanceof Error ? error.message : 'Failed to upload file content');

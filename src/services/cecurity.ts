@@ -269,6 +269,7 @@ export class CecurityService {
 
       console.log('Response Status:', response.status);
       console.log('Response Status Text:', response.statusText);
+      console.log('Response Content-Type:', response.headers.get('content-type'));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -276,12 +277,60 @@ export class CecurityService {
         throw new Error(`File content upload failed: ${errorText}`);
       }
 
-      const responseData = await response.json();
-      console.log('Response Data:', responseData);
+      // If the response is successful (200), we don't need to parse it as JSON
+      // The server might return an empty response or a non-JSON response
       console.log('File content uploaded successfully');
       console.log('=====================================\n');
     } catch (error) {
       console.error('Error uploading file content:', error);
+      throw error;
+    }
+  }
+
+  static async completeUpload(uploadId: string): Promise<string> {
+    try {
+      if (!this.API_KEY) {
+        throw new Error('API key is not defined');
+      }
+
+      const token = await this.getToken();
+      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/${uploadId}/complete`;
+
+      const headers = {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      console.log('\n=== Completing Upload ===');
+      console.log('URL:', url);
+      console.log('Headers:', {
+        'Authorization': `Bearer ${token.substring(0, 20)}...`
+      });
+      console.log('Upload ID:', uploadId);
+      console.log('=====================================\n');
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      console.log('Response Status:', response.status);
+      console.log('Response Status Text:', response.statusText);
+      console.log('Response Content-Type:', response.headers.get('content-type'));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload completion failed:', errorText);
+        throw new Error(`Upload completion failed: ${errorText}`);
+      }
+
+      const responseData = await response.json();
+      console.log('Upload completion response:', responseData);
+      console.log('=====================================\n');
+
+      return responseData.jobId;
+    } catch (error) {
+      console.error('Error completing upload:', error);
       throw error;
     }
   }

@@ -104,7 +104,7 @@ export class CecurityService {
       const { error } = await supabase
         .from('tokens')
         .upsert({
-          subscription_id: login,
+          subscription_id: this.SUBSCRIPTION_ID,
           token,
           expires_at: expiresAt.toISOString(),
           login,

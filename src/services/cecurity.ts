@@ -6,9 +6,29 @@ interface AuthenticationResponse {
   language: string;
 }
 
+interface FileUploadResponse {
+  uploadId: string;
+}
+
+interface FileWithFingerprint {
+  // Required parameters
+  fileName: string;  // Must be at least 5 characters
+  fileSize: number;  // Size in bytes
+
+  // Optional parameters with defaults
+  fileType?: 'invoice' | 'annex' | 'linked_annex';  // Default: 'invoice'
+  source?: 'not-specified' | 'pdp-cc' | 'pdp-peppol';  // Default: 'not-specified'
+  
+  // Optional parameters
+  fingerPrint?: string;
+  fingerPrintAlgorithm?: 'NONE' | 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-512';
+  sourceId?: string;  // Must be 36 characters if provided
+}
+
 export class CecurityService {
   private static readonly API_URL = process.env.NEXT_PUBLIC_CECURITY_API_URL;
   private static readonly API_KEY = process.env.NEXT_PUBLIC_CECURITY_API_KEY;
+  private static readonly SUBSCRIPTION_ID = process.env.NEXT_PUBLIC_CECURITY_SUBSCRIPTION_ID;
 
   static async authenticate(login: string, password: string): Promise<AuthenticationResponse> {
     // Verify the API key is actually loaded
@@ -101,6 +121,110 @@ export class CecurityService {
       }
     } catch (error) {
       console.error('Error storing token:', error);
+      throw error;
+    }
+  }
+
+  private static async getToken(): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from('tokens')
+        .select('token')
+        .eq('subscription_id', this.SUBSCRIPTION_ID)
+        .single();
+
+      if (error) {
+        console.error('Error getting token:', error);
+        throw new Error(`Failed to get token: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('No token found for subscription');
+      }
+
+      return data.token;
+    } catch (error) {
+      console.error('Error in getToken:', error);
+      throw error;
+    }
+  }
+
+  private static validateFile(file: FileWithFingerprint): void {
+    if (!file.fileName || file.fileName.length < 5) {
+      throw new Error('fileName is required and must be at least 5 characters');
+    }
+
+    if (typeof file.fileSize !== 'number' || file.fileSize < 0) {
+      throw new Error('fileSize is required and must be a positive number');
+    }
+
+    if (file.sourceId && file.sourceId.length !== 36) {
+      throw new Error('sourceId must be exactly 36 characters if provided');
+    }
+  }
+
+  static async uploadFiles(files: FileWithFingerprint[]): Promise<FileUploadResponse> {
+    try {
+      // Validate all files before making the request
+      files.forEach(file => this.validateFile(file));
+
+      const token = await this.getToken();
+      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/new?subscriptionId=${this.SUBSCRIPTION_ID}`;
+
+      // Prepare the request body with default values
+      const requestBody = {
+        files: files.map(file => ({
+          fileName: file.fileName,
+          fileSize: file.fileSize,
+          fileType: file.fileType || 'invoice',
+          source: file.source || 'not-specified',
+          ...(file.fingerPrint && { fingerPrint: file.fingerPrint }),
+          ...(file.fingerPrintAlgorithm && { fingerPrintAlgorithm: file.fingerPrintAlgorithm }),
+          ...(file.sourceId && { sourceId: file.sourceId })
+        })),
+        channel: 'portal',
+        mailAddress: null
+      };
+
+      console.log('\n=== Cecurity File Upload Request ===');
+      console.log('URL:', url);
+      console.log('Headers:', {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      });
+      console.log('Body:', requestBody);
+      console.log('=====================================\n');
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('\n=== Cecurity File Upload Response ===');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error Response:', errorText);
+        throw new Error(`File upload failed: ${response.statusText}`);
+      }
+
+      const data: FileUploadResponse = await response.json();
+      console.log('Response Data:', data);
+      console.log('=====================================\n');
+      
+      return data;
+    } catch (error) {
+      console.error('\n=== Cecurity File Upload Error ===');
+      console.error(error);
+      console.log('=====================================\n');
       throw error;
     }
   }

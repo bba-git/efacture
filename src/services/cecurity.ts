@@ -10,19 +10,14 @@ interface FileUploadResponse {
   uploadId: string;
 }
 
-interface FileWithFingerprint {
-  // Required parameters
-  fileName: string;  // Must be at least 5 characters
-  fileSize: number;  // Size in bytes
-
-  // Optional parameters with defaults
-  fileType?: 'invoice' | 'annex' | 'linked_annex';  // Default: 'invoice'
-  source?: 'not-specified' | 'pdp-cc' | 'pdp-peppol';  // Default: 'not-specified'
-  
-  // Optional parameters
+export interface FileWithFingerprint {
+  fileName: string;
+  fileSize: number;
+  fileType: 'invoice' | 'credit-note' | 'debit-note' | 'other';
+  source: string;
+  sourceId?: string;
   fingerPrint?: string;
   fingerPrintAlgorithm?: 'NONE' | 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-512';
-  sourceId?: string;  // Must be 36 characters if provided
 }
 
 export class CecurityService {
@@ -165,66 +160,46 @@ export class CecurityService {
 
   static async uploadFiles(files: FileWithFingerprint[]): Promise<FileUploadResponse> {
     try {
-      // Validate all files before making the request
-      files.forEach(file => this.validateFile(file));
-
       const token = await this.getToken();
       const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/new?subscriptionId=${this.SUBSCRIPTION_ID}`;
 
-      // Prepare the request body with default values
       const requestBody = {
         files: files.map(file => ({
           fileName: file.fileName,
           fileSize: file.fileSize,
-          fileType: file.fileType || 'invoice',
-          source: file.source || 'not-specified',
-          ...(file.fingerPrint && { fingerPrint: file.fingerPrint }),
-          ...(file.fingerPrintAlgorithm && { fingerPrintAlgorithm: file.fingerPrintAlgorithm }),
-          ...(file.sourceId && { sourceId: file.sourceId })
+          fileType: 'invoice',
+          source: 'not-specified',
+          sourceId: null
         })),
         channel: 'portal',
-        mailAddress: null
+        mailAddress: 'test@yopmail.com'
       };
 
-      console.log('\n=== Cecurity File Upload Request ===');
-      console.log('URL:', url);
-      console.log('Headers:', {
+      if (!this.API_KEY) {
+        throw new Error('API key is not defined');
+      }
+
+      const headers = {
         'Accept': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      });
-      console.log('Body:', requestBody);
-      console.log('=====================================\n');
+        'Content-Type': 'application/json',
+        'X-ApiKey': this.API_KEY
+      };
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(requestBody)
       });
 
-      console.log('\n=== Cecurity File Upload Response ===');
-      console.log('Status:', response.status);
-      console.log('Status Text:', response.statusText);
-      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error Response:', errorText);
-        throw new Error(`File upload failed: ${response.statusText}`);
+        throw new Error(`File upload failed: ${errorText}`);
       }
 
-      const data: FileUploadResponse = await response.json();
-      console.log('Response Data:', data);
-      console.log('=====================================\n');
-      
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('\n=== Cecurity File Upload Error ===');
-      console.error(error);
-      console.log('=====================================\n');
+      console.error('Error uploading files:', error);
       throw error;
     }
   }

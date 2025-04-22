@@ -186,6 +186,11 @@ export class CecurityService {
         'X-ApiKey': this.API_KEY
       };
 
+      console.log('\n=== Creating Upload Session ===');
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Body:', requestBody);
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -194,12 +199,89 @@ export class CecurityService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`File upload failed: ${errorText}`);
+        console.error('Upload session creation failed:', errorText);
+        throw new Error(`Upload session creation failed: ${errorText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('Upload session created:', result);
+      console.log('=====================================\n');
+
+      return result;
     } catch (error) {
-      console.error('Error uploading files:', error);
+      console.error('Error creating upload session:', error);
+      throw error;
+    }
+  }
+
+  static async uploadFileContent(uploadId: string, files: File[]): Promise<void> {
+    try {
+      if (!this.API_KEY) {
+        throw new Error('API key is not defined');
+      }
+
+      const token = await this.getToken();
+      const url = `${this.API_URL}/public/v3/einvoice-inbound/uploads/${uploadId}/upload`;
+
+      // Create FormData object
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('formFiles', file);
+      });
+
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${token}`
+      };
+
+      console.log('\n=== Upload File Content Request ===');
+      console.log('URL:', url);
+      console.log('Headers:', {
+        'Authorization': `Bearer ${token.substring(0, 20)}...`
+      });
+      console.log('Upload ID:', uploadId);
+      console.log('Files:', files.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type
+      })));
+      
+      // Log FormData contents
+      console.log('FormData Contents:');
+      const formDataEntries = [];
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          formDataEntries.push({
+            key,
+            value: `File(${value.name}, ${value.size} bytes, ${value.type})`
+          });
+        } else {
+          formDataEntries.push({ key, value });
+        }
+      }
+      console.log('Request Body:', JSON.stringify(formDataEntries, null, 2));
+      console.log('=====================================\n');
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+
+      console.log('Response Status:', response.status);
+      console.log('Response Status Text:', response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('File content upload failed:', errorText);
+        throw new Error(`File content upload failed: ${errorText}`);
+      }
+
+      const responseData = await response.json();
+      console.log('Response Data:', responseData);
+      console.log('File content uploaded successfully');
+      console.log('=====================================\n');
+    } catch (error) {
+      console.error('Error uploading file content:', error);
       throw error;
     }
   }
